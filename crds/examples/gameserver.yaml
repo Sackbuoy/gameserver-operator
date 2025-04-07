@@ -1,0 +1,7 @@
+apiVersion: goopy.us/v1
+kind: GameServer
+metadata:
+  name: sackbuoy-server
+  namespace: games
+spec:
+  gameType: "minecraft"

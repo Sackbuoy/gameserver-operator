@@ -3,9 +3,12 @@ module github.com/Sackbuoy/gameserver-operator
 go 1.23.5
 
 require (
-	helm.sh/helm/v3 v3.17.2
+	github.com/mitchellh/mapstructure v1.5.0
+	go.uber.org/zap v1.27.0
+	helm.sh/helm/v3 v3.17.3
 	k8s.io/apimachinery v0.32.3
 	k8s.io/client-go v0.32.3
+	sigs.k8s.io/kustomize/kyaml v0.18.1
 )
 
 require (
@@ -113,6 +116,7 @@ require (
 	go.opentelemetry.io/otel v1.28.0 // indirect
 	go.opentelemetry.io/otel/metric v1.28.0 // indirect
 	go.opentelemetry.io/otel/trace v1.28.0 // indirect
+	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.36.0 // indirect
 	golang.org/x/net v0.37.0 // indirect
 	golang.org/x/oauth2 v0.23.0 // indirect
@@ -139,7 +143,6 @@ require (
 	oras.land/oras-go v1.2.5 // indirect
 	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3 // indirect
 	sigs.k8s.io/kustomize/api v0.18.0 // indirect
-	sigs.k8s.io/kustomize/kyaml v0.18.1 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.2 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )

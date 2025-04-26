@@ -32,9 +32,211 @@ spec:
                   type: string
             spec:
               type: object
-              # Define your specific resource properties here
               properties:
-                # Your custom fields go here
                 gameType:
                   type: string
-
+                helmChart:
+                  type: object
+                  required:
+                    - repository
+                    - name
+                    - version
+                  properties:
+                    repository:
+                      type: string
+                      description: "Helm chart repository URL"
+                    name:
+                      type: string
+                      description: "Name of the Helm chart"
+                    version:
+                      type: string
+                      description: "Version of the Helm chart to use"
+                    valuesOverride:
+                      type: string
+                      description: "Values to override in the Helm chart, as string"
+                    timeout:
+                      type: integer
+                      description: "Timeout for Helm operations in seconds"
+                      default: 300
+                resources:
+                  type: object
+                  properties:
+                    requests:
+                      type: object
+                      properties:
+                        cpu:
+                          type: string
+                          description: "CPU resource request (e.g., '500m', '1')"
+                        memory:
+                          type: string
+                          description: "Memory resource request (e.g., '1Gi')"
+                        ephemeralStorage:
+                          type: string
+                          description: "Ephemeral storage request (e.g., '10Gi')"
+                    limits:
+                      type: object
+                      properties:
+                        cpu:
+                          type: string
+                          description: "CPU resource limit (e.g., '1', '2')"
+                        memory:
+                          type: string
+                          description: "Memory resource limit (e.g., '2Gi')"
+                        ephemeralStorage:
+                          type: string
+                          description: "Ephemeral storage limit (e.g., '20Gi')"
+                persistence:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: true
+                      description: "Whether to enable persistent storage"
+                    size:
+                      type: string
+                      description: "Size of persistent volume (e.g., '10Gi')"
+                    storageClass:
+                      type: string
+                      description: "Storage class for the PVC"
+                networking:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                      enum: ["ClusterIP", "NodePort", "LoadBalancer"]
+                      default: "ClusterIP"
+                      description: "Service type for the game server"
+                    ports:
+                      type: array
+                      items:
+                        type: object
+                        required:
+                          - port
+                        properties:
+                          name:
+                            type: string
+                            description: "Name of the port"
+                          port:
+                            type: integer
+                            description: "Port number"
+                          targetPort:
+                            type: integer
+                            description: "Target port number (defaults to port)"
+                          protocol:
+                            type: string
+                            enum: ["TCP", "UDP"]
+                            default: "TCP"
+                            description: "Protocol for this port"
+                          nodePort:
+                            type: integer
+                            description: "Node port when type is NodePort"
+                    annotations:
+                      type: object
+                      additionalProperties: true
+                      description: "Annotations for the service"
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  description: "Current phase of the game server (Pending, Deploying, Running, Failed, etc.)"
+                message:
+                  type: string
+                  description: "Human-readable message about the current state"
+                helmRelease:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                      description: "Name of the Helm release"
+                    version:
+                      type: integer
+                      description: "Version of the Helm release"
+                    lastDeployed:
+                      type: string
+                      format: "date-time"
+                      description: "Last time the Helm release was deployed"
+                deployment:
+                  type: object
+                  properties:
+                    available:
+                      type: boolean
+                      description: "Whether the deployment is available"
+                    replicas:
+                      type: integer
+                      description: "Current number of replicas"
+                    readyReplicas:
+                      type: integer
+                      description: "Number of ready replicas"
+                    updatedReplicas:
+                      type: integer
+                      description: "Number of updated replicas"
+                networking:
+                  type: object
+                  properties:
+                    serviceType:
+                      type: string
+                      description: "Type of service created"
+                    clusterIP:
+                      type: string
+                      description: "Cluster IP of the service"
+                    externalIP:
+                      type: string
+                      description: "External IP for LoadBalancer service"
+                    ports:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                          port:
+                            type: integer
+                          targetPort:
+                            type: integer
+                          nodePort:
+                            type: integer
+                          protocol:
+                            type: string
+                conditions:
+                  type: array
+                  description: "Kubernetes-style conditions"
+                  items:
+                    type: object
+                    required:
+                      - type
+                      - status
+                    properties:
+                      type:
+                        type: string
+                        description: "Type of condition (e.g., Ready, Available, HelmDeployed, etc.)"
+                      status:
+                        type: string
+                        enum: ["True", "False", "Unknown"]
+                        description: "Status of the condition"
+                      lastTransitionTime:
+                        type: string
+                        format: "date-time"
+                        description: "Last time the condition transitioned from one status to another"
+                      reason:
+                        type: string
+                        description: "Machine-readable reason for the condition's last transition"
+                      message:
+                        type: string
+                        description: "Human-readable message indicating details about last transition"
+                lastUpdated:
+                  type: string
+                  format: "date-time"
+                  description: "Last time the status was updated"
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Game
+          type: string
+          jsonPath: .spec.gameType
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp

@@ -1,78 +1,185 @@
 package manager
 
 import (
-  "fmt"
-  "os"
-  "log"
-  "helm.sh/helm/v3/pkg/action"
+	// "context"
+	"fmt"
+	"os"
+
+	"github.com/Sackbuoy/gameserver-operator/internal/crds"
+	"go.uber.org/zap"
+	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/cli"
+	"helm.sh/helm/v3/pkg/release"
+	// metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	// "k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
+	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
 type Manager struct {
+	helmSettings          *cli.EnvSettings
+	installedCharts       []*release.Release
+  instanceMap *crds.CRDInstanceMap
+	k8sClient             *dynamic.DynamicClient
+	logger                *zap.Logger
+	logOutput             func(string, ...any)
 }
 
-func New() (*Manager, error) {
-  return &Manager{}, nil
-}
+func New(k8sClient *dynamic.DynamicClient, logger *zap.Logger, instanceMap *crds.CRDInstanceMap) (*Manager, error) {
+	settings := cli.New()
 
-func (m *Manager) Create(url, name, namespace string) error {
-  settings := cli.New()
-	
+	logOutput := func(format string, args ...interface{}) {
+		msg := fmt.Sprintf(format, args...)
+		logger.Info(msg)
+	}
 	// Create a new Helm install action
+	return &Manager{
+		helmSettings:          settings,
+		k8sClient:             k8sClient,
+		instanceMap: instanceMap,
+		logger:                logger,
+		logOutput:             logOutput,
+	}, nil
+}
+
+func (m *Manager) Create(crdObject map[string]any, chartName, releaseName, namespace string) error {
 	actionConfig := new(action.Configuration)
-	if err := actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), os.Getenv("HELM_DRIVER"), log.Printf); err != nil {
-		log.Fatalf("Failed to initialize action configuration: %v", err)
+	if err := actionConfig.Init(m.helmSettings.RESTClientGetter(), namespace, os.Getenv("HELM_DRIVER"), m.logOutput); err != nil {
+		m.logger.Error("Failed to initialize Helm Action Config", zap.Error(err))
 	}
 
-	client := action.NewInstall(actionConfig)
-	client.Namespace = namespace
-	client.ReleaseName = name
-	
-	// Specify chart location (local or remote)
-	// chartPath := "https://helm.github.io/examples" // or URL for remote charts
-	chartPath := url // or URL for remote charts
+	installer := action.NewInstall(actionConfig)
+	installer.Namespace = namespace
+	installer.ReleaseName = releaseName
+
+	gameServer, err := mapToGameServer(crdObject)
+	if err != nil {
+		m.logger.Fatal("Failed to install chart: %v", zap.Error(err))
+	}
+
+	chartPath := fmt.Sprintf("charts/%s", chartName)
+
 	chart, err := loader.Load(chartPath)
 	if err != nil {
-		log.Fatalf("Failed to load chart: %v", err)
+		m.logger.Fatal("Failed to load chart: %v", zap.Error(err))
 	}
-	
-	// Install the chart
-	rel, err := client.Run(chart, nil) // second parameter is values
+
+	valuesOverride := make(map[string]any)
+
+	err = yaml.Unmarshal([]byte(gameServer.Spec.HelmChart.ValuesOverride), &valuesOverride)
 	if err != nil {
-		log.Fatalf("Failed to install chart: %v", err)
+		m.logger.Fatal("Failed to parse values Overrides")
 	}
-	
-	fmt.Printf("Successfully installed release %s\n", rel.Name)
-  return nil
+
+	chartInstall, err := installer.Run(chart, valuesOverride)
+	if err != nil {
+		m.logger.Fatal("Failed to install chart: %v", zap.Error(err))
+	}
+
+  err = m.instanceMap.Create(gameServer)
+	if err != nil {
+		m.logger.Fatal("Failed to add instance to internal cache", zap.Error(err))
+	}
+
+	m.logger.Info("Successfully installed release", zap.String("ReleaseName", chartInstall.Name))
+
+	return nil
 }
 
-// TODO
+// TODO.
 func (m *Manager) Read() error {
-  return nil
+	return nil
 }
 
-// TODO
+// TODO.
 func (m *Manager) Update() error {
-  return nil
+	return nil
 }
 
-func (m *Manager) Delete(name, namespace string) error {
-  settings := cli.New()
-	
-	// Create a new Helm install action
+func (m *Manager) Delete(releaseName, namespace string) error {
 	actionConfig := new(action.Configuration)
-	if err := actionConfig.Init(settings.RESTClientGetter(), namespace, os.Getenv("HELM_DRIVER"), log.Printf); err != nil {
-		log.Fatalf("Failed to initialize action configuration: %v", err)
+	if err := actionConfig.Init(m.helmSettings.RESTClientGetter(), namespace, os.Getenv("HELM_DRIVER"), m.logOutput); err != nil {
+		m.logger.Error("Failed to initialize Helm Action Config", zap.Error(err))
 	}
 
-  uninstaller := action.NewUninstall(actionConfig)
-  result, err := uninstaller.Run(name)
-  if err != nil {
-		log.Fatalf("Failed run helm uninstall: %v", err)
-  }
+	installedCharts, err := getInstalledCharts(actionConfig)
+	if err != nil {
+		return err
+	}
 
-  fmt.Printf("%s\n", result.Info)
-  
-  return nil
+	if len(installedCharts) == 0 {
+		return fmt.Errorf("%s not installed in namespace %s", releaseName, namespace)
+	}
+
+	for _, chart := range installedCharts {
+		if releaseName == chart.Name {
+			break
+		}
+
+		return fmt.Errorf("%s not installed in namespace %s", releaseName, namespace)
+	}
+
+	uninstaller := action.NewUninstall(actionConfig)
+
+	result, err := uninstaller.Run(releaseName)
+	if err != nil {
+		m.logger.Fatal("Failed run helm uninstall: %v", zap.Error(err))
+	}
+
+  err = m.instanceMap.Delete(releaseName)
+	if err != nil {
+		m.logger.Error("Failed to add instance to internal cache", zap.Error(err))
+	}
+
+	m.logger.Info(result.Info)
+
+	return nil
 }
+
+// func (m *Manager) Sync(gvc schema.GroupVersionResource) error {
+// 	actionConfig := new(action.Configuration)
+// 	if err := actionConfig.Init(m.helmSettings.RESTClientGetter(), "", os.Getenv("HELM_DRIVER"), m.logOutput); err != nil {
+// 		m.logger.Fatal("Failed to initialize action configuration: %v", zap.Error(err))
+// 	}
+//
+// 	chartsMap := make(map[string]*release.Release, 0)
+//
+// 	installedCharts, err := getInstalledCharts(actionConfig)
+// 	if err != nil {
+// 		return err
+// 	}
+//
+// 	for _, release := range installedCharts {
+// 		chartsMap[release.Name] = release
+// 	}
+//
+// 	// set installed Charts List
+// 	m.installedCharts = installedCharts
+//
+// 	// Get existing Game instances to avoid duplicate notifications
+// 	existingInstances, err := m.k8sClient.Resource(gvc).Namespace("").List(context.TODO(), metav1.ListOptions{})
+// 	if err != nil {
+// 		fmt.Printf("Error listing existing games: %v\n", err)
+// 		os.Exit(1)
+// 	}
+//
+// 	// check every chart for corresponding CRD
+// 	for _, instance := range existingInstances.Items {
+// 		name := instance.GetName()
+// 		_, ok := chartsMap[name]
+//
+// 		if !ok {
+// 			msg := fmt.Sprintf("Chart not found for CRD instance %s. Installing...", name)
+// 			m.logger.Info(msg)
+// 			// TODO
+// 		}
+//
+// 		var newCRD crds.GameServer
+//
+// 		mapUnstructuredToStruct(&instance, &newCRD)
+// 		m.installedCRDInstances[name] = &newCRD
+// 	}
+//
+// 	return nil
+// }

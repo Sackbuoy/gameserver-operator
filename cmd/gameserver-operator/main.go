@@ -4,13 +4,15 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"os"
 	"path/filepath"
-  "time"
+	"sync"
 
+	"github.com/Sackbuoy/gameserver-operator/internal/crds"
 	"github.com/Sackbuoy/gameserver-operator/internal/manager"
+	"github.com/Sackbuoy/gameserver-operator/internal/reconciler"
+	"github.com/Sackbuoy/gameserver-operator/internal/watcher"
+	"go.uber.org/zap"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
@@ -19,12 +21,18 @@ import (
 )
 
 func main() {
+	logger, _ := zap.NewProduction()
+	defer logger.Sync() // flushes buffer, if any
+
+	ctx := context.Background()
+
 	var kubeconfig *string
 	if home := homedir.HomeDir(); home != "" {
 		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
 	} else {
 		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
 	}
+
 	flag.Parse()
 
 	// Try to use in-cluster config first, fall back to kubeconfig file
@@ -33,134 +41,73 @@ func main() {
 		// Create config from kubeconfig file
 		config, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)
 		if err != nil {
-			fmt.Printf("Error building kubeconfig: %v\n", err)
-			os.Exit(1)
+			logger.Fatal("Error building kubeconfig: %v\n", zap.Error(err))
 		}
 	}
 
 	// Create a dynamic client for working with custom resources
 	dynamicClient, err := dynamic.NewForConfig(config)
 	if err != nil {
-		fmt.Printf("Error creating dynamic client: %v\n", err)
-		os.Exit(1)
+		logger.Fatal("Error creating dynamic client: %v\n", zap.Error(err))
 	}
 
 	// Define the resource to watch - Game CRD
-	gamesGVR := schema.GroupVersionResource{
+	gvc := schema.GroupVersionResource{
 		Group:    "goopy.us",
 		Version:  "v1",
 		Resource: "gameservers",
 	}
 
-	fmt.Println("Watching for GameServer instances...")
+	logger.Info("Watching for GameServer instances...")
 
 	// Get existing Game instances to avoid duplicate notifications
-	existingGames, err := dynamicClient.Resource(gamesGVR).Namespace("").List(context.TODO(), metav1.ListOptions{})
+	existingGames, err := dynamicClient.Resource(gvc).Namespace("").List(ctx, metav1.ListOptions{})
 	if err != nil {
-		fmt.Printf("Error listing existing games: %v\n", err)
-		os.Exit(1)
+		logger.Fatal("Error listing existing games: %v\n", zap.Error(err))
 	}
 
 	existingGameMap := make(map[string]bool)
+
 	for _, game := range existingGames.Items {
 		key := fmt.Sprintf("%s/%s", game.GetNamespace(), game.GetName())
 		existingGameMap[key] = true
 	}
 
-	// Create a watcher for Game instances
-	watcher, err := dynamicClient.Resource(gamesGVR).Namespace("").Watch(context.TODO(), metav1.ListOptions{})
+	var wg sync.WaitGroup
+	instanceMap, err := crds.NewInstanceMap()
 	if err != nil {
-		fmt.Printf("Error creating watcher: %v\n", err)
-		os.Exit(1)
+		logger.Fatal("Failed to make CRD instance map", zap.Error(err))
 	}
 
-  manager, err := manager.New()
-  if err != nil {
-    panic(err)
-  }
+	manager, err := manager.New(dynamicClient, logger, instanceMap)
+	if err != nil {
+		logger.Fatal("Error creating manager: %v\n", zap.Error(err))
+	}
+
+	watcher, err := watcher.New(ctx, logger, dynamicClient, gvc, manager)
+	if err != nil {
+		logger.Fatal("Error creating watcher: %v\n", zap.Error(err))
+	}
+
+	reconciler, err := reconciler.New(ctx, logger, manager, dynamicClient, gvc, instanceMap)
+	if err != nil {
+		logger.Fatal("Error creating watcher: %v\n", zap.Error(err))
+	}
 
 	// Watch for events
-	for event := range watcher.ResultChan() {
-		obj, ok := event.Object.(*unstructured.Unstructured)
-		if !ok {
-			continue
-		}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		watcher.Watch()
+	}()
 
-		// Get details from the game instance
-		name := obj.GetName()
-		namespace := obj.GetNamespace()
-		key := fmt.Sprintf("%s/%s", namespace, name)
-    creationTimestamp := obj.GetCreationTimestamp()
-		
-    // Extract some details from the spec to display
-    spec, found, err := unstructured.NestedMap(obj.Object, "spec")
-    if err != nil || !found {
-      fmt.Println("  Unable to extract spec details")
-      continue
-    }
+	// periodically loop through CRD instances to ensure corresponding resources
+	// are synced
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		reconciler.MonitorLoop(ctx, "")
+	}()
 
-		// Only notify for new games
-		switch event.Type {
-    case "ADDED":
-      if time.Since(creationTimestamp.Time).Seconds() > 60 {
-        continue
-      }
-
-      fmt.Printf("CRD Event detected: %s\n", key)
-      fmt.Printf("Event Type: %s\n", event.Type)
-
-      // Display some fields from the Game
-      var gameType string
-      var ok bool
-      fmt.Printf("  Name: %s\n", name)
-      
-      if gameType, ok = spec["gameType"].(string); ok {
-        fmt.Printf("  Type: %s\n", gameType)
-      }
-      
-      chartPath := "./charts/" + gameType
-      err = manager.Create(chartPath, name, namespace)
-      if err != nil {
-        fmt.Printf("Error creating resources: %v\n", err)
-        continue
-      }
-    case "MODIFIED":
-      fmt.Printf("CRD Event detected: %s\n", key)
-      fmt.Printf("Event Type: %s\n", event.Type)
-
-      fmt.Printf("  Name: %s\n", name)
-      
-      if gameType, ok := spec["gameType"].(string); ok {
-        fmt.Printf("  Type: %s\n", gameType)
-      }
-      
-      if players, ok := spec["players"].(int64); ok {
-        fmt.Printf("  Players: %d\n", players)
-      }
-      err = manager.Update()
-      if err != nil {
-        fmt.Printf("Error updating resources: %v\n", err)
-        continue
-      }
-    case "DELETED":
-      fmt.Printf("CRD Event detected: %s\n", key)
-      fmt.Printf("Event Type: %s\n", event.Type)
-
-      var gameType string
-      var ok bool
-
-      // Display some fields from the Game
-      fmt.Printf("  Name: %s\n", name)
-      
-      if gameType, ok = spec["gameType"].(string); ok {
-        fmt.Printf("  Type: %s\n", gameType)
-      }
-      
-      err = manager.Delete(name, namespace)
-      if err != nil {
-        fmt.Printf("Error deleting resources: %v\n", err)
-        continue
-      }
-		}
-	}
+	wg.Wait()
 }

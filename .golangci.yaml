@@ -1,0 +1,25 @@
+version: "2"
+run:
+  modules-download-mode: vendor
+  tests: false
+linters:
+  default: none
+  enable:
+    - nlreturn
+    - tagalign
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+    - goimports
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/Sackbuoy/gameserver-operator)
+    goimports:
+      local-prefixes:
+        - github.com/Sackbuoy/gameserver-operator
+

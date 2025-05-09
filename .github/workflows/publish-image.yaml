@@ -20,8 +20,8 @@ jobs:
 
     - name: Debug login
       run: |
-      echo "Attempting login with actor: ${{ github.actor }}"
-      docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} 2>&1 || echo "Login failed"
+        echo "Attempting login with actor: ${{ github.actor }}"
+        docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} 2>&1 || echo "Login failed"
 
     - name: Checkout code
       uses: actions/checkout@v4

@@ -2,7 +2,7 @@ name: Publish release
 
 env:
   REGISTRY: ghcr.io
-  IMAGE: sackbuoy/portfolio
+  IMAGE: sackbuoy/gameserver-operator
 
 on:
   release:

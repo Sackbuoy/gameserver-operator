@@ -37,7 +37,7 @@
       copyToRoot = pkgs.buildEnv {
         name = "image-root";
         paths = [
-          self.packages.${system}.default
+          self.packages.${system}.goBuild
           pkgs.coreutils
           pkgs.shadow
           pkgs.bashInteractive

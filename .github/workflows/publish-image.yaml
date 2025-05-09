@@ -21,7 +21,7 @@ jobs:
     - name: Debug login
       run: |
         echo "Attempting login with actor: ${{ github.actor }}"
-        docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} 2>&1 || echo "Login failed"
+        docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.PAT_TOKEN }} 2>&1 || echo "Login failed"
 
     - name: Checkout code
       uses: actions/checkout@v4
@@ -39,7 +39,7 @@ jobs:
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+        password: ${{ secrets.PAT_TOKEN }}
 
     - name: Build Docker image with Nix
       run: |

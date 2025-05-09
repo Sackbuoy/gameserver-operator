@@ -109,15 +109,20 @@ func (m *Manager) Delete(releaseName, namespace string) error {
 	}
 
 	if len(installedCharts) == 0 {
-		return fmt.Errorf("%s not installed in namespace %s", releaseName, namespace)
+		return fmt.Errorf("No charts were found in %s", namespace)
 	}
 
+	// Fix: Check all charts before returning error
+	found := false
 	for _, chart := range installedCharts {
-		if releaseName == chart.Name {
-			break
-		}
+			if releaseName == chart.Name {
+					found = true
+					break
+			}
+	}
 
-		return fmt.Errorf("%s not installed in namespace %s", releaseName, namespace)
+	if !found {
+			return fmt.Errorf("%s not installed in namespace %s", releaseName, namespace)
 	}
 
 	uninstaller := action.NewUninstall(actionConfig)
@@ -137,49 +142,3 @@ func (m *Manager) Delete(releaseName, namespace string) error {
 	return nil
 }
 
-// func (m *Manager) Sync(gvc schema.GroupVersionResource) error {
-// 	actionConfig := new(action.Configuration)
-// 	if err := actionConfig.Init(m.helmSettings.RESTClientGetter(), "", os.Getenv("HELM_DRIVER"), m.logOutput); err != nil {
-// 		m.logger.Fatal("Failed to initialize action configuration: %v", zap.Error(err))
-// 	}
-//
-// 	chartsMap := make(map[string]*release.Release, 0)
-//
-// 	installedCharts, err := getInstalledCharts(actionConfig)
-// 	if err != nil {
-// 		return err
-// 	}
-//
-// 	for _, release := range installedCharts {
-// 		chartsMap[release.Name] = release
-// 	}
-//
-// 	// set installed Charts List
-// 	m.installedCharts = installedCharts
-//
-// 	// Get existing Game instances to avoid duplicate notifications
-// 	existingInstances, err := m.k8sClient.Resource(gvc).Namespace("").List(context.TODO(), metav1.ListOptions{})
-// 	if err != nil {
-// 		fmt.Printf("Error listing existing games: %v\n", err)
-// 		os.Exit(1)
-// 	}
-//
-// 	// check every chart for corresponding CRD
-// 	for _, instance := range existingInstances.Items {
-// 		name := instance.GetName()
-// 		_, ok := chartsMap[name]
-//
-// 		if !ok {
-// 			msg := fmt.Sprintf("Chart not found for CRD instance %s. Installing...", name)
-// 			m.logger.Info(msg)
-// 			// TODO
-// 		}
-//
-// 		var newCRD crds.GameServer
-//
-// 		mapUnstructuredToStruct(&instance, &newCRD)
-// 		m.installedCRDInstances[name] = &newCRD
-// 	}
-//
-// 	return nil
-// }

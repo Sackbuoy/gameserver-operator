@@ -41,8 +41,12 @@
           pkgs.coreutils
           pkgs.shadow
           pkgs.bashInteractive
+          (pkgs.runCommand "charts-dir" {} ''
+            mkdir -p $out/charts
+            cp -r ${./charts}/* $out/charts/
+          '')
         ];
-        pathsToLink = ["/bin" "/etc" "/home" "/var"];
+        pathsToLink = ["/bin" "/etc" "/home" "/var" "/charts"];
       };
 
       config = {
@@ -60,14 +64,14 @@
         groupadd -r nonroot
         useradd -m -r -g nonroot nonroot
 
-        mkdir -p /app /tmp
+        mkdir -p /app /tmp /charts
         chmod 1777 /tmp
 
         mkdir /home/nonroot/.kube
         touch /home/nonroot/.kube/config
         chmod 744 /home/nonroot/.kube
         chmod 644 /home/nonroot/.kube/config
-        chown -R nonroot:nonroot /home/nonroot /app
+        chown -R nonroot:nonroot /home/nonroot /app /charts
       '';
     };
   in {

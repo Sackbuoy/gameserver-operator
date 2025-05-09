@@ -58,7 +58,7 @@ func (m *Manager) Create(crdObject map[string]any, chartName, releaseName, names
 		m.logger.Fatal("Failed to install chart: %v", zap.Error(err))
 	}
 
-	chartPath := fmt.Sprintf("charts/%s", chartName)
+	chartPath := fmt.Sprintf("/charts/%s", chartName)
 
 	chart, err := loader.Load(chartPath)
 	if err != nil {

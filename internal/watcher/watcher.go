@@ -67,44 +67,45 @@ func (w *Watcher) Watch() error {
 		// Only notify for new games
 		switch event.Type {
 		case "ADDED":
-      continue
 			if time.Since(creationTimestamp.Time).Seconds() > 60 {
 				continue
 			}
 
-			w.logger.Info("CRD Event detected: %s\n", zap.String("Key", key))
-			w.logger.Info("Event Type: %s\n", zap.String("Event Type", string(event.Type)))
+			w.logger.Info("CRD Event detected", zap.String("Key", key))
+			w.logger.Info("With Event Type", zap.String("EventType", string(event.Type)))
 
-			w.logger.Info("  Name: %s\n", zap.String("Name", name))
+			// Display some fields from the Game
+			w.logger.Info("Found Game", zap.String("Name", name))
 
 			err = w.manager.Create(obj.Object, crd.Spec.HelmChart.Name, name, namespace)
 			if err != nil {
-				w.logger.Error("Error creating resources: %v\n", zap.Error(err))
+				w.logger.Error("Error creating resources", zap.Error(err))
 
 				continue
 			}
 		case "MODIFIED":
-			w.logger.Info("CRD Event detected: %s\n", zap.String("Key", key))
-			w.logger.Info("Event Type: %s\n", zap.String("Event Type", string(event.Type)))
+			w.logger.Info("CRD Event detected", zap.String("Key", key))
+			w.logger.Info("With Event Type", zap.String("EventType", string(event.Type)))
 
-			w.logger.Info("  Name: %s\n", zap.String("Name", name))
+			// Display some fields from the Game
+			w.logger.Info("Found Game", zap.String("Name", name))
 
 			err = w.manager.Update()
 			if err != nil {
-				w.logger.Error("Error updating resources: %v\n", zap.Error(err))
+				w.logger.Error("Error updating resources", zap.Error(err))
 
 				continue
 			}
 		case "DELETED":
-			w.logger.Info("CRD Event detected: %s\n", zap.String("Key", key))
-			w.logger.Info("Event Type: %s\n", zap.String("EventType", string(event.Type)))
+			w.logger.Info("CRD Event detected", zap.String("Key", key))
+			w.logger.Info("With Event Type", zap.String("EventType", string(event.Type)))
 
 			// Display some fields from the Game
-			w.logger.Info("  Name: %s\n", zap.String("Name", name))
+			w.logger.Info("Found Game", zap.String("Name", name))
 
 			err = w.manager.Delete(name, namespace)
 			if err != nil {
-				w.logger.Error("Error deleting resources: %v\n", zap.Error(err))
+				w.logger.Error("Error deleting resources", zap.Error(err))
 
 				continue
 			}

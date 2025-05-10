@@ -41,14 +41,14 @@ func main() {
 		// Create config from kubeconfig file
 		config, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)
 		if err != nil {
-			logger.Fatal("Error building kubeconfig: %v\n", zap.Error(err))
+			logger.Fatal("Error building kubeconfig", zap.Error(err))
 		}
 	}
 
 	// Create a dynamic client for working with custom resources
 	dynamicClient, err := dynamic.NewForConfig(config)
 	if err != nil {
-		logger.Fatal("Error creating dynamic client: %v\n", zap.Error(err))
+		logger.Fatal("Error creating dynamic client", zap.Error(err))
 	}
 
 	// Define the resource to watch - Game CRD
@@ -63,7 +63,7 @@ func main() {
 	// Get existing Game instances to avoid duplicate notifications
 	existingGames, err := dynamicClient.Resource(gvc).Namespace("").List(ctx, metav1.ListOptions{})
 	if err != nil {
-		logger.Fatal("Error listing existing games: %v\n", zap.Error(err))
+		logger.Error("Error listing existing games", zap.Error(err))
 	}
 
 	existingGameMap := make(map[string]bool)
@@ -76,22 +76,22 @@ func main() {
 	var wg sync.WaitGroup
 	instanceMap, err := crds.NewInstanceMap()
 	if err != nil {
-		logger.Fatal("Failed to make CRD instance map", zap.Error(err))
+		logger.Error("Failed to make CRD instance map", zap.Error(err))
 	}
 
 	manager, err := manager.New(dynamicClient, logger, instanceMap)
 	if err != nil {
-		logger.Fatal("Error creating manager: %v\n", zap.Error(err))
+		logger.Fatal("Error creating manager", zap.Error(err))
 	}
 
 	watcher, err := watcher.New(ctx, logger, dynamicClient, gvc, manager)
 	if err != nil {
-		logger.Fatal("Error creating watcher: %v\n", zap.Error(err))
+		logger.Fatal("Error creating watcher", zap.Error(err))
 	}
 
 	reconciler, err := reconciler.New(ctx, logger, manager, dynamicClient, gvc, instanceMap)
 	if err != nil {
-		logger.Fatal("Error creating watcher: %v\n", zap.Error(err))
+		logger.Fatal("Error creating reconciler", zap.Error(err))
 	}
 
 	// Watch for events

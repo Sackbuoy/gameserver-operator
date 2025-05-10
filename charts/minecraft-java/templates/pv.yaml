@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ .Release.Name }}-data-pv  # Give it a unique name
+spec:
+  capacity:
+    storage: 10Gi  # Must be >= the size requested in your PVC
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: standard  # Must match your PVC's storageClassName
+  hostPath:
+    path: /var/lib/plexmediaserver/disk2/gameservers  # Path on the node where data will be stored

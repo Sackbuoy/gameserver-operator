@@ -56,13 +56,13 @@ securityContext: {}
 # This is for setting up a service more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/
 service:
   # This sets the service type more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
-  type: ClusterIP
+  type: LoadBalancer
   # This sets the ports more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#field-spec-ports
   port: 25565
 
 # This block is for setting up the ingress for more information can be found here: https://kubernetes.io/docs/concepts/services-networking/ingress/
 ingress:
-  enabled: true
+  enabled: false
   className: nginx
   annotations:
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
@@ -75,6 +75,11 @@ ingress:
     - domain: goopy.us
       hosts:
         - goopy.us
+
+persistence:
+  enabled: true
+  size: 2Gi
+  storageClass: ""  # Empty string means use the default storageClass
 
 resources: {}
   # We usually recommend not to specify default resources and to leave this as a conscious

@@ -4,7 +4,7 @@ metadata:
   name: sackbuoy-server
   namespace: games
 spec:
-  gameType: "minecraft"
+  gameType: "minecraft-java"
   helmChart:
     repository: https://itzg.github.io/minecraft-server-charts
     name: minecraft

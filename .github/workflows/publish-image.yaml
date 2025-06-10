@@ -17,12 +17,6 @@ jobs:
     
     # Ensure Nix and Docker are set up
     steps:
-
-    - name: Debug login
-      run: |
-        echo "Attempting login with actor: ${{ github.actor }}"
-        docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.PAT_TOKEN }} 2>&1 || echo "Login failed"
-
     - name: Checkout code
       uses: actions/checkout@v4
 

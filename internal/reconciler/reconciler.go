@@ -94,7 +94,7 @@ func (r *Reconciler) reconcile(ctx context.Context, actionConfig action.Configur
       // if release is nil and err isn't helm chart is not installed
       if err != nil {
         r.logger.Info("No Helm chart release found. Installing...", zap.String("Instance", releaseName))
-        r.manager.Create(instance.Object, newCRD.Spec.HelmChart.Name, releaseName, instance.GetNamespace())
+        r.manager.Create(instance.Object, newCRD.Spec.GameType, releaseName, instance.GetNamespace())
       } else {
         // this would be weird, should never happen
         r.logger.Error("No helm chart release found, but no error was returned", zap.String("Instance", releaseName))

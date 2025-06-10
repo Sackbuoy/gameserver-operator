@@ -62,6 +62,8 @@ func (m *Manager) Create(crdObject map[string]any, chartName, releaseName, names
 	chart, err := loader.Load(chartPath)
 	if err != nil {
 		m.logger.Error("Failed to load chart", zap.Error(err))
+
+		return err
 	}
 
 	valuesOverride := make(map[string]any)

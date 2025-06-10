@@ -10,4 +10,4 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   storageClassName: standard  # Must match your PVC's storageClassName
   hostPath:
-    path: /var/lib/plexmediaserver/disk2/gameservers  # Path on the node where data will be stored
+    path: /var/lib/plexmediaserver/disk2/gameservers/  # Path on the node where data will be stored

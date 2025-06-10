@@ -77,7 +77,7 @@ func (w *Watcher) Watch() error {
 			// Display some fields from the Game
 			w.logger.Info("Found Game", zap.String("Name", name))
 
-			err = w.manager.Create(obj.Object, crd.Spec.HelmChart.Name, name, namespace)
+			err = w.manager.Create(obj.Object, crd.Spec.GameType, name, namespace)
 			if err != nil {
 				w.logger.Error("Error creating resources", zap.Error(err))
 

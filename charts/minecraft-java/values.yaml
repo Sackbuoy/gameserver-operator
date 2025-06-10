@@ -60,22 +60,6 @@ service:
   # This sets the ports more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#field-spec-ports
   port: 25565
 
-# This block is for setting up the ingress for more information can be found here: https://kubernetes.io/docs/concepts/services-networking/ingress/
-ingress:
-  enabled: false
-  className: nginx
-  annotations:
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
-  hosts:
-    - domain: goopy.us
-      paths:
-        - path: /
-          pathType: Prefix
-  tls:
-    - domain: goopy.us
-      hosts:
-        - goopy.us
-
 persistence:
   enabled: true
   size: 2Gi
